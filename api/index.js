@@ -7,100 +7,74 @@ export default async function handler(req, res) {
         }
 
         try {
-            // 1. COLLECTE DES VECTEURS D'INFLUENCE (RestCountries)
-            const countryRes = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(country)}?fullText=true`);
-            if (!countryRes.ok) throw new Error("Accès base de données pays impossible.");
-            const countryData = (await countryRes.json())[0];
+            // 1. COLLECTE DES DONNÉES (Source: RestCountries /v3.1/)
+            const countryRes = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(country)}`);
+            
+            if (!countryRes.ok) throw new Error(`Erreur API: ${countryRes.status}`);
 
-            // 2. EXTRACTION DES DONNÉES DE PUISSANCE
-            const pop = countryData.population;
-            const borders = countryData.borders || [];
-            const area = countryData.area;
-            const region = countryData.region;
-            const subregion = countryData.subregion;
-            const languages = countryData.languages ? Object.values(countryData.languages) : [];
-            const latlng = countryData.latlng || [0, 0];
-            
-            // 3. ALGORITHME DE SCORING GÉOPOLITIQUE (Puppet Master v4.1 Enhanced)
-            
-            // A. Classification Rigoureuse des Blocs
-            let influenceBloc = "AUTONOME / NON-ALIGNÉ";
-            let powerColor = "⚪";
-            
-            const westernSubregions = ["Western Europe", "Northern Europe", "Southern Europe", "Northern America"];
-            const bricsMembers = ["Russia", "China", "India", "Brazil", "South Africa", "Iran", "Egypt", "Ethiopia", "United Arab Emirates"];
-            
-            if (westernSubregions.includes(subregion) || ["Australia", "New Zealand", "Japan", "South Korea"].includes(country)) {
-                influenceBloc = "BLOC OCCIDENTAL (OTAN/PARTENAIRES)";
-                powerColor = "🔵";
-            } else if (bricsMembers.includes(country) || ["Belarus", "Central Asia"].includes(subregion)) {
-                influenceBloc = "ALLIANCE EURASIENNE / BRICS+";
-                powerColor = "🔴";
-            } else if (["Middle Africa", "Western Africa", "Eastern Africa"].includes(subregion)) {
-                influenceBloc = "SUD GLOBAL (INFLUENCE MULTIPOLAIRE)";
-                powerColor = "🟡";
-            } else if (["South America", "Central America"].includes(subregion)) {
-                influenceBloc = "ZONE D'INFLUENCE AMÉRICAINE / SUD GLOBAL";
-                powerColor = "🟠";
-            }
+            const data = await countryRes.json();
+            if (!data || data.length === 0) throw new Error("Pays non trouvé.");
 
-            // B. Analyse de la Profondeur Stratégique
-            const density = pop / area;
-            // Indice de Puissance (IPP) : Poids relatif territoire/population
-            const powerIndex = (Math.log10(pop) * 0.4 + Math.log10(area) * 0.6).toFixed(2);
-            
-            // C. Évaluation de la Menace Frontalière (Friction Systémique)
-            const frictionScore = (borders.length * 1.5).toFixed(1);
-            
-            // D. Détermination du Risque Géopolitique
-            let conflictRisk = "STABLE";
-            let strategyNote = "Maintien du statu quo.";
-            
-            if (borders.length >= 7 || (borders.length >= 4 && density > 250)) {
-                conflictRisk = "HAUTE FRAGILITÉ (ENCLAVEMENT)";
-                strategyNote = "Risque élevé de débordement transfrontalier ou d'instabilité interne.";
-            } else if (powerIndex > 7.5) {
-                conflictRisk = "PUISSANCE RÉGIONALE / HÉGÉMON";
-                strategyNote = "Capacité de projection et d'influence majeure sur les pays limitrophes.";
-            }
+            const c = data[0];
 
-            // 4. RÉDACTION DU RAPPORT TECHNIQUE AVANCÉ
+            // 2. EXTRACTION DES CHAMPS CLÉS (Logique utilisateur)
+            const id = c.cca3; // Code ISO3
+            const nom = c.name.common;
+            const pop = c.population || 0;
+            const area = c.area || 1;
+            const neighbors = c.borders || [];
+            const nbVoisins = neighbors.length;
+            const coords = c.latlng || [0, 0];
+            const isUN = c.unMember;
+
+            // 3. ALGORITHME DE CALCUL DES PROXIES (Logique Gemini enrichie)
+            
+            // A. Classification par Catégorie de Puissance
+            let categorie = "Petit État";
+            if (pop > 100000000) categorie = "Superpuissance";
+            else if (pop > 10000000) categorie = "Puissance majeure / Émergent";
+            
+            // B. Calcul du Risque Géopolitique (Proxy Tensions)
+            // Formule: (nb_voisins / (pop / 1M))
+            const popInMillions = pop / 1000000;
+            const risqueGeo = popInMillions > 0 ? (nbVoisins / popInMillions).toFixed(3) : "INF";
+            
+            // C. Détermination de la Stabilité Interne (Simulée pour fusion NewsAPI)
+            const stabiliteInterne = Math.max(15, Math.min(98, 100 - (risqueGeo * 10))).toFixed(0);
+
+            // 4. RÉDACTION DU DOSSIER DE RENSEIGNEMENT
             const analysis = `
 ╔════════════════════════════════════════════════════════╗
-  DOSSIER DE RENSEIGNEMENT STRATÉGIQUE : UNITÉ PUPPET
-  SYSTÈME DE SURVEILLANCE MONDIAL // ACCÈS NIVEAU 4
+  UNITÉ PUPPET : ANALYSE DÉTERMINISTE DES FLUX
+  SYSTÈME DE SURVEILLANCE // SOURCE : OPEN-SOURCE (REST)
 ╚════════════════════════════════════════════════════════╝
 
-[IDENTIFICATION DE LA CIBLE]
-> NOM : ${country.toUpperCase()}
-> COORDONNÉES : ${latlng[0].toFixed(2)}N, ${latlng[1].toFixed(2)}E
-> POLARITÉ : ${powerColor} ${influenceBloc}
-> RISQUE SYSTÉMIQUE : ${conflictRisk}
+[IDENTIFICATION ISO-3]
+> ID UNIQUE : ${id}
+> STATUT ONU : ${isUN ? 'MEMBRE ACTIF' : 'OBSERVATEUR / NON-MEMBRE'}
+> COORDONNÉES : ${coords[0].toFixed(2)}N, ${coords[1].toFixed(2)}E
 
-[1. PARAMÈTRES DE PUISSANCE ÉTATIQUE]
-> Indice de Profondeur Stratégique : ${powerIndex} / 10
-> Démographie Active : ${(pop / 1000000).toFixed(2)}M d'unités
-> Contrôle Spatial : ${area.toLocaleString()} km²
-> Densité de Pression : ${density.toFixed(1)} hab/km²
+[1. PARAMÈTRES DE PUISSANCE]
+> CATÉGORIE : ${categorie.toUpperCase()}
+> UNITÉS DÉMOGRAPHIQUES : ${pop.toLocaleString()}
+> CONTRÔLE SPATIAL : ${area.toLocaleString()} KM²
 
-[2. VECTEURS d'INTERACTION & FRICTION]
-> Axes de pénétration (Frontières) : ${borders.length} points de contact
-> Voisinage immédiat : ${borders.length > 0 ? borders.join(', ') : 'ISOLEMENT GÉOGRAPHIQUE'}
-> Score de Friction Systémique : ${frictionScore} / 15
-> Sphère d'influence : ${subregion.toUpperCase()}
+[2. CALCUL DES PROXIES DE RISQUE]
+> NOMBRE DE FRONTIÈRES : ${nbVoisins}
+> RISQUE GÉO (VOISINS/POP) : ${risqueGeo}
+> SCORE DE STABILITÉ ESTIMÉ : ${stabiliteInterne}%
 
-[3. ANALYSE DE LA DOCTRINE & VULNÉRABILITÉS]
-${strategyNote}
-L'analyse structurale indique que ${country} possède une ${area > 1000000 ? 'profondeur stratégique majeure permettant d\'absorber des chocs externes' : 'profondeur limitée, rendant le territoire vulnérable aux manœuvres rapides'}. 
-La position géographique ${borders.length > 5 ? 'place le pays au cœur de tensions multilatérales complexes' : 'offre une protection relative contre les pressions frontalières directes'}.
-L'influence linguistique (${languages.slice(0, 2).join(', ')}) constitue un vecteur de soft-power facilitant des ponts diplomatiques vers d'autres zones d'intérêt stratégique.
+[3. RÉSEAU D'INFLUENCE]
+> AXES LIMITROPHES : ${nbVoisins > 0 ? neighbors.join(', ') : 'ISOLEMENT TOTAL'}
+> VULNÉRABILITÉ : ${risqueGeo > 1 ? 'CRITIQUE (DÉPENDANCE/ENCLAVEMENT)' : 'MODÉRÉE (AUTONOMIE)'}
 
-[4. ÉTAT DES FLUX]
-> Statut Infrastructure : ${pop > 50000000 ? 'RÉSEAU SATURÉ (CRITIQUE)' : 'RÉSEAU FLUIDE'}
-> Priorité d'Interception : ${powerIndex > 7 ? 'ALPHA (PRIORITAIRE)' : 'GAMMA (OBSERVATION)'}
+[4. ANALYSE STRUCTURELLE]
+L'analyse pour ${nom} indique un profil de "${categorie}". 
+Avec un ratio de friction de ${risqueGeo}, le pays présente ${risqueGeo > 5 ? 'un risque d\'asphyxie par ses voisins' : 'une résilience structurelle face aux pressions frontalières'}.
+Le score de stabilité de ${stabiliteInterne}% suggère un pivot stratégique ${pop > 50000000 ? 'majeur' : 'secondaire'} dans la zone ${c.subregion.toUpperCase()}.
 
-[STATUS] : ANALYSE VALIDÉE PAR L'ALGORITHME V4.1
-[SIGNATURE : SECTION_R_STRAT // PUPPET_MASTER]
+[STATUS] : DONNÉES SYNCHRONISÉES (UPDATE 1H)
+[SIGNATURE : SECTION_R_STRAT // GEMINI_GEOPOLITICS]
             `.trim();
 
             return res.status(200).json({ analysis });
@@ -108,10 +82,9 @@ L'influence linguistique (${languages.slice(0, 2).join(', ')}) constitue un vect
         } catch (error) {
             return res.status(500).json({ 
                 error: "Défaut de liaison", 
-                analysis: `[ERREUR CRITIQUE] : Interception impossible. La cible ${country} est protégée par un brouillage ou hors réseau.` 
+                analysis: `[ERREUR CRITIQUE] : Extraction impossible. Cible protégée ou hors-champ.` 
             });
         }
     }
-
     return res.status(405).json({ error: "Méthode non autorisée" });
 }
