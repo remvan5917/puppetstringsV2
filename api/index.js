@@ -10,6 +10,11 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
         const { country } = req.body;
+        
+        if (!country) {
+            return res.status(400).json({ error: "Requête invalide", analysis: "Aucun pays spécifié." });
+        }
+
         try {
             const response = await fetch("https://api.deepseek.com/chat/completions", {
                 method: "POST",
@@ -26,15 +31,31 @@ export default async function handler(req, res) {
                         },
                         { role: "user", content: `Rapport pour : ${country}` }
                     ],
-                    max_tokens: 200
+                    max_tokens: 250,
+                    temperature: 0.7
                 })
             });
 
             const data = await response.json();
-            const analysis = data.choices?.[0]?.message?.content || "Données indisponibles.";
-            return res.status(200).json({ analysis });
+
+            // Vérification de la structure de la réponse DeepSeek
+            if (data && data.choices && data.choices[0] && data.choices[0].message) {
+                const analysis = data.choices[0].message.content;
+                return res.status(200).json({ analysis });
+            } else {
+                console.error("Structure de réponse API inattendue:", data);
+                return res.status(502).json({ 
+                    error: "Données invalides", 
+                    analysis: "Le serveur a renvoyé un format de données illisible." 
+                });
+            }
+
         } catch (error) {
-            return res.status(500).json({ error: "Échec serveur", analysis: "Erreur de liaison proxy." });
+            console.error("Erreur Proxy DeepSeek:", error);
+            return res.status(500).json({ 
+                error: "Échec serveur", 
+                analysis: "Erreur de liaison proxy : impossible de contacter l'IA." 
+            });
         }
     }
 
