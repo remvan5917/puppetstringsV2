@@ -3,400 +3,343 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PUPPET STRINGS SYSTEM | GEOPOLITICAL ORACLE v9.2</title>
+    <title>PUPPET STRINGS | STRATEGIC OVERLORD v11.5</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;500;700&family=Orbitron:wght@400;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;500;700&family=Orbitron:wght@400;700;900&display=swap');
         
         :root { 
             --primary: #00f2ff; 
-            --risk: #ff0055;
-            --stable: #4ade80;
+            --danger: #ff0055;
+            --warning: #f59e0b;
             --bg: #020408; 
-            --panel-bg: rgba(5, 10, 20, 0.98);
-            --country-default: #0d1a2d;
+            --panel-bg: rgba(4, 8, 15, 0.95);
         }
 
         body { 
-            background: var(--bg); 
-            color: var(--primary); 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: 'Fira Code', monospace;
-            text-transform: uppercase;
+            background: var(--bg); color: var(--primary); 
+            margin: 0; overflow: hidden; 
+            font-family: 'Fira Code', monospace; text-transform: uppercase;
+            background-image: radial-gradient(circle at 50% 50%, #0a1428 0%, #020408 100%);
         }
 
         .orbitron { font-family: 'Orbitron', sans-serif; }
 
-        .map-container { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 100%; height: 100%; 
-            z-index: 1; 
+        body::before {
+            content: " "; position: fixed; top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 200; background-size: 100% 2px, 3px 100%; pointer-events: none;
         }
+
+        .map-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
 
         .country { 
-            fill: var(--country-default); 
-            stroke: rgba(0, 242, 255, 0.15); 
-            stroke-width: 0.5; 
-            transition: fill 0.4s ease, stroke 0.3s ease; 
-            cursor: crosshair;
+            fill: #0d1a2d; stroke: rgba(0, 242, 255, 0.15); 
+            stroke-width: 0.6; transition: all 0.3s ease; cursor: crosshair;
         }
-
-        .country:hover { fill: #1a3a5f; stroke: var(--primary); }
-        .country.active { fill: rgba(0, 242, 255, 0.4); stroke: var(--primary); stroke-width: 1.5; }
+        .country:hover { fill: #1e3a5f; stroke: var(--primary); }
+        .country.active { fill: rgba(0, 242, 255, 0.25); stroke: var(--primary); stroke-width: 1.5; filter: drop-shadow(0 0 10px var(--primary)); }
 
         .terminal-border {
-            border: 1px solid rgba(0, 242, 255, 0.2);
-            background: rgba(0,0,0,0.85);
-            backdrop-filter: blur(8px);
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            background: rgba(0, 10, 20, 0.8); backdrop-filter: blur(8px);
+            box-shadow: 0 0 20px rgba(0, 242, 255, 0.1);
         }
 
         #info-panel {
-            background: var(--panel-bg);
-            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-            transform: translateX(100%);
-            border-left: 1px solid rgba(0, 242, 255, 0.2);
+            background: var(--panel-bg); transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            transform: translateX(100%); border-left: 2px solid var(--primary);
             z-index: 100;
         }
-
         #info-panel.visible { transform: translateX(0); }
 
         .stat-card {
-            background: rgba(255,255,255,0.03);
-            padding: 12px;
-            border: 1px solid rgba(255,255,255,0.05);
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 100%);
+            border: 1px solid rgba(255,255,255,0.1); padding: 12px;
+            position: relative; overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 2px; height: 100%; background: var(--primary);
         }
 
-        .btn-filter {
-            padding: 6px 15px;
-            background: black;
-            border: 1px solid rgba(0, 242, 255, 0.2);
-            font-size: 9px;
-            cursor: pointer;
-            pointer-events: auto;
-        }
+        #oracle-input { text-transform: none !important; }
 
-        .btn-filter.active { background: var(--primary); color: black; font-weight: bold; }
-
-        .loading-overlay {
-            position: fixed;
-            inset: 0;
-            background: var(--bg);
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            transition: opacity 1s ease;
-        }
-
-        .news-item {
+        .signal-item {
             border-left: 2px solid var(--primary);
-            margin-bottom: 8px;
             padding-left: 8px;
-            animation: fadeIn 0.5s ease-out;
-            font-size: 8px;
-            background: rgba(0, 242, 255, 0.03);
+            margin-bottom: 6px;
+            animation: slideIn 0.5s ease-out;
         }
 
-        @keyframes fadeIn {
+        @keyframes slideIn {
             from { opacity: 0; transform: translateX(-10px); }
             to { opacity: 1; transform: translateX(0); }
-        }
-
-        .lang-tag {
-            font-size: 7px;
-            background: rgba(0, 242, 255, 0.2);
-            padding: 1px 3px;
-            border-radius: 2px;
-            margin-right: 5px;
-        }
-
-        /* Scanline effect */
-        .scanline {
-            width: 100%;
-            height: 100px;
-            z-index: 10;
-            background: linear-gradient(0deg, rgba(0, 242, 255, 0) 0%, rgba(0, 242, 255, 0.05) 50%, rgba(0, 242, 255, 0) 100%);
-            opacity: 0.1;
-            position: absolute;
-            bottom: 100%;
-            animation: scanline 6s linear infinite;
-        }
-
-        @keyframes scanline {
-            0% { bottom: 100%; }
-            100% { bottom: -100px; }
         }
     </style>
 </head>
 <body>
 
-    <div id="loader" class="loading-overlay">
-        <div class="orbitron text-2xl animate-pulse mb-4 italic tracking-widest">PUPPET_STRINGS_INITIALIZATION...</div>
-        <div class="w-64 h-1 bg-gray-900 overflow-hidden relative">
-            <div class="h-full bg-cyan-400 w-full animate-pulse"></div>
+    <!-- Ecran de Chargement -->
+    <div id="loader" class="loading-overlay fixed inset-0 bg-black z-[1000] flex flex-col items-center justify-center">
+        <div class="orbitron text-4xl font-black mb-8 tracking-[1em] text-cyan-500 animate-pulse">OVERLORD_V11</div>
+        <div class="w-96 h-[2px] bg-gray-900 relative">
+            <div id="loader-bar" class="h-full bg-cyan-400 w-0 transition-all duration-500 shadow-[0_0_15px_#00f2ff]"></div>
         </div>
-        <p class="text-[8px] mt-4 opacity-50" id="loader-status">PULLING_GLOBAL_STRINGS...</p>
+        <div id="loader-status" class="text-[10px] mt-6 tracking-[0.5em] opacity-60">SYNCHRONISATION DES RÉSEAUX NEURAUX...</div>
     </div>
 
-    <div class="scanline"></div>
+    <!-- Carte du monde D3.js -->
     <div id="map" class="map-container"></div>
 
-    <!-- HUD -->
-    <div class="fixed top-0 left-0 w-full h-full pointer-events-none z-50 p-6 flex flex-col justify-between">
+    <!-- HUD Interface -->
+    <div class="fixed inset-0 pointer-events-none z-50 p-8 flex flex-col justify-between">
         <div class="flex justify-between items-start">
-            <div class="terminal-border p-5 pointer-events-auto">
-                <div class="flex items-center gap-3">
-                    <div class="w-2 h-2 bg-red-600 rounded-full animate-ping"></div>
-                    <h1 class="orbitron text-2xl font-black italic tracking-tighter">PUPPET_STRINGS_v9.2</h1>
+            <div class="terminal-border p-6 pointer-events-auto">
+                <div class="flex items-center gap-4">
+                    <div class="w-3 h-3 bg-cyan-500 animate-ping"></div>
+                    <h1 class="orbitron text-3xl font-black italic tracking-tighter">STRATEGIC_OVERLORD</h1>
                 </div>
-                <div class="flex gap-4 mt-2">
-                    <p class="text-[7px] text-cyan-400 font-bold">AUTHORITY: MASTER_ORACLE</p>
-                    <p class="text-[7px] opacity-60">STATUS: RECOILING_GLOBAL_SIGNALS</p>
+                <div class="flex gap-6 mt-3 text-[8px] font-bold">
+                    <span class="text-cyan-400 ai-glow">COGNITIVE_CORE_ONLINE</span>
+                    <span class="opacity-40">UPLINK: SECURE_VERCEL_PROXY</span>
                 </div>
             </div>
             
-            <div class="text-right pointer-events-auto p-4 terminal-border">
-                <div id="clock" class="orbitron text-xl font-bold italic text-white tracking-widest">00:00:00 Z</div>
-                <div class="text-[7px] text-red-500 mt-1 font-bold animate-pulse">PUPPET_CONTROL: ACTIVE</div>
+            <div class="pointer-events-auto flex flex-col items-end gap-2">
+                <div class="terminal-border p-4 text-right">
+                    <div id="clock" class="orbitron text-2xl font-bold tracking-widest">--:--:--</div>
+                    <div class="text-[9px] text-red-500 font-bold mt-1 tracking-widest italic">NIVEAU_ALERTE: VOLATILE</div>
+                </div>
             </div>
         </div>
 
         <div class="flex justify-between items-end">
-            <!-- LIVE FEED GDELT -->
-            <div class="p-4 terminal-border w-[450px] pointer-events-auto bg-black/90">
-                <div class="flex justify-between items-center mb-2">
-                    <div class="flex items-center gap-2">
-                        <div class="w-1.5 h-1.5 bg-cyan-500 rounded-full"></div>
-                        <span class="text-[8px] font-bold tracking-widest">LIVE_STRING_VIBRATIONS (GDELT)</span>
-                    </div>
-                    <span class="text-[7px] opacity-40">AUTO-REFRESH: 20s</span>
+            <div class="p-4 terminal-border w-[450px] pointer-events-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-[9px] font-black">FLUX_SATELLITE_GDELT</span>
+                    <span id="signal-status" class="text-[7px] text-cyan-400 animate-pulse">RÉCEPTION_ACTIVE</span>
                 </div>
-                <div id="log-feed" class="h-40 overflow-hidden flex flex-col gap-1 text-gray-400">
-                    <!-- News feed content -->
-                </div>
-            </div>
-            
-            <div class="flex flex-col items-end gap-2 pointer-events-auto">
-                <div class="flex gap-2" id="filter-group">
-                    <button onclick="visualize('neutral', this)" class="btn-filter active">NEUTRE</button>
-                    <button onclick="visualize('tone', this)" class="btn-filter border-red-900 text-red-500">TENSION_STRINGS</button>
-                    <button onclick="visualize('power', this)" class="btn-filter">PUISSANCE</button>
+                <div id="log-feed" class="h-28 overflow-hidden text-[9px] space-y-2 opacity-90 italic">
+                    <div class="opacity-40">INITIALISATION DU FLUX...</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- INFO PANEL -->
-    <div id="info-panel" class="fixed right-0 top-0 h-full w-[480px] flex flex-col p-8 pointer-events-auto shadow-2xl">
-        <div class="flex justify-between items-start mb-10">
-            <div>
-                <h2 id="country-name" class="orbitron text-4xl font-black italic leading-none">--</h2>
-                <div id="country-id" class="text-[10px] text-cyan-400 mt-2 font-bold tracking-widest">NODE_ID: --</div>
+    <!-- PANNEAU D'INFORMATION LATÉRAL -->
+    <div id="info-panel" class="fixed right-0 top-0 h-full w-[600px] flex flex-col pointer-events-auto">
+        <div class="p-12 flex-1 overflow-y-auto">
+            <div class="flex justify-between items-start mb-12">
+                <div>
+                    <div class="text-[10px] text-cyan-500 font-black tracking-[0.3em] mb-3">COMMAND_NODE_DATA</div>
+                    <h2 id="country-name" class="orbitron text-5xl font-black italic tracking-tighter leading-none text-white">--</h2>
+                </div>
+                <button onclick="hidePanel()" class="text-3xl opacity-20 hover:opacity-100 transition-all">✕</button>
             </div>
-            <button onclick="hidePanel()" class="text-3xl font-light opacity-50 hover:opacity-100 transition-opacity">✕</button>
-        </div>
 
-        <div class="flex-1 overflow-y-auto pr-4 space-y-6">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="stat-card border-red-900/40">
-                    <div class="text-[8px] opacity-50 mb-2 uppercase">Vibration des fils (Tone)</div>
-                    <div id="stat-tone" class="text-3xl font-bold orbitron">0.0</div>
+            <div class="grid grid-cols-3 gap-4 mb-10">
+                <div class="stat-card">
+                    <div class="text-[8px] opacity-40 mb-1">PROJECTION_FORCE</div>
+                    <div id="stat-power" class="text-2xl font-black orbitron">--</div>
+                    <div class="h-1 bg-white/10 mt-2"><div id="bar-power" class="h-full bg-cyan-500" style="width:0%"></div></div>
                 </div>
                 <div class="stat-card">
-                    <div class="text-[8px] opacity-50 mb-2 uppercase">Inertie de Masse</div>
-                    <div id="stat-power" class="text-3xl font-bold orbitron">0%</div>
+                    <div class="text-[8px] opacity-40 mb-1">VULNÉRABILITÉ</div>
+                    <div id="stat-threat" class="text-2xl font-black orbitron">--</div>
+                    <div class="h-1 bg-white/10 mt-2"><div id="bar-threat" class="h-full bg-red-600" style="width:0%"></div></div>
+                </div>
+                <div class="stat-card">
+                    <div class="text-[8px] opacity-40 mb-1">RÉSERVES_OR</div>
+                    <div id="stat-gold" class="text-xl font-black orbitron">--</div>
+                    <div class="h-1 bg-white/10 mt-2"><div id="bar-gold" class="h-full bg-amber-500" style="width:0%"></div></div>
                 </div>
             </div>
 
-            <div class="terminal-border p-5 bg-white/5 space-y-3">
-                <div class="text-[9px] font-black text-cyan-400 mb-2 border-b border-cyan-900 pb-2 uppercase">Extraction PUPPET_DATA</div>
-                <div id="country-news-feed" class="text-[10px] space-y-2 opacity-80 italic">
-                    Écoute des fréquences locales...
+            <div class="report-section mb-8">
+                <div class="flex items-center gap-3 mb-4">
+                    <div class="w-8 h-[1px] bg-cyan-500"></div>
+                    <span class="text-[11px] font-black tracking-[0.2em]">ANALYSE_STRATÉGIQUE</span>
+                </div>
+                <div id="report-text" class="text-[13px] leading-relaxed text-gray-400 italic">
+                    Sélectionnez un noeud pour analyse...
                 </div>
             </div>
+        </div>
 
-            <div class="terminal-border p-5 bg-red-500/5 border-red-900/30">
-                <div class="text-[9px] font-black text-red-500 mb-3 tracking-widest uppercase">Directives du Marionnettiste</div>
-                <div id="algo-text" class="text-[11px] leading-relaxed text-gray-300 italic uppercase">
-                    Veuillez sélectionner une marionnette géographique.
+        <!-- INTERFACE S.Y.B.I.L. (IA) -->
+        <div id="oracle-container" class="p-8 border-t border-white/10 bg-black/40">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <div id="ai-status-dot" class="w-2 h-2 bg-cyan-500 animate-pulse"></div>
+                    <span class="text-[11px] font-black tracking-[0.4em] text-cyan-400">UNITÉ_SYNTHÈSE_S.Y.B.I.L.</span>
                 </div>
+                <span id="ai-loading" class="hidden text-[9px] animate-bounce">TRAITEMENT_DES_DONNÉES...</span>
+            </div>
+            <div id="oracle-response-box" class="h-48 overflow-y-auto mb-6 pr-4 italic text-gray-300 scroll-smooth">
+                SYSTÈME OPÉRATIONNEL. TRANSMETTEZ VOS PARAMÈTRES D'ANALYSE.
+            </div>
+            <div class="relative flex items-center">
+                <div class="absolute left-4 text-cyan-500 text-[12px] font-bold">CMD></div>
+                <input type="text" id="oracle-input" placeholder="Entrer paramètres..." class="w-full pl-14 py-4 bg-white/5 border border-white/10 text-[12px] orbitron focus:outline-none focus:border-cyan-500 transition-all" onkeypress="handleOracleKey(event)">
             </div>
         </div>
     </div>
 
     <script>
-        let svg, g, projection, path;
-        let processedData = new Map();
-        let gdeltCache = [];
+        // Simulation du fichier de configuration système (index.json)
+        const SYSTEM_CONFIG = {
+            "FRA": { "gold": "2437t", "note": "Pivot européen, capacité nucléaire." },
+            "USA": { "gold": "8133t", "note": "Hégémonie monétaire, protection systémique." },
+            "CHN": { "gold": "2264t", "note": "Accumulation agressive pour dé-dollariser." },
+            "CHE": { "gold": "1040t", "note": "Coffre-fort mondial, stabilité maximale." },
+            "DEU": { "gold": "3352t", "note": "Moteur industriel, pilier de l'UE." }
+        };
 
-        // 1. MOTEUR DE DONNÉES GDELT REALTIME
-        async function fetchGdeltNews() {
+        let COUNTRY_DB = new Map();
+        let svg, g, projection, path;
+
+        async function initSystem() {
+            const bar = document.getElementById('loader-bar');
+            const status = document.getElementById('loader-status');
             try {
-                const gdeltUrl = `https://api.gdeltproject.org/api/v2/doc/doc?query=(conflict OR crisis OR alert OR diplomatic)&mode=artlist&format=json&maxrecords=15&timespan=1h`;
-                const response = await fetch(gdeltUrl);
-                const data = await response.json();
+                status.innerText = "ACCÈS AUX ARCHIVES MONDIALES...";
+                bar.style.width = "40%";
+                const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca3,region,subregion,population,area,borders,landlocked');
+                const countries = await response.json();
+                bar.style.width = "100%";
                 
-                if (data && data.articles) {
-                    gdeltCache = data.articles;
-                    updateLiveFeed(data.articles);
-                } else {
-                    simulateLiveEvents();
+                countries.forEach(c => {
+                    const pop = c.population || 0;
+                    const area = c.area || 0;
+                    const neighbors = c.borders ? c.borders.length : 0;
+                    const pScore = Math.min(100, (Math.log10(pop + 1) * 6 + Math.log10(area + 1) * 3)).toFixed(1);
+                    const vScore = (neighbors * 5 + (c.landlocked ? 20 : 0) + (pop < 1000000 ? 30 : 0)).toFixed(1);
+                    
+                    COUNTRY_DB.set(c.cca3, {
+                        id: c.cca3, name: c.name.common, region: c.region, population: pop,
+                        scores: { power: parseFloat(pScore), threat: parseFloat(vScore) }
+                    });
+                });
+
+                setTimeout(() => document.getElementById('loader').style.display = 'none', 800);
+                initMap();
+                fetchLiveSignals();
+                setInterval(fetchLiveSignals, 30000);
+            } catch (e) { console.error(e); }
+        }
+
+        async function fetchLiveSignals() {
+            const feed = document.getElementById('log-feed');
+            const status = document.getElementById('signal-status');
+            try {
+                const res = await fetch(`https://api.gdeltproject.org/api/v2/doc/doc?query=(conflict OR economy OR threat)&mode=artlist&format=json&maxrecords=5&sort=hybridrel`);
+                const data = await res.json();
+                if(data.articles && data.articles.length > 0) {
+                    feed.innerHTML = data.articles.map(a => `<div class="signal-item"><span class="text-white font-bold">>> SIGNAL_RECEPT:</span> ${a.title.toUpperCase().substring(0, 75)}...</div>`).join('');
+                    status.innerText = "RÉCEPTION_ACTIVE";
+                    status.className = "text-[7px] text-cyan-400 animate-pulse";
                 }
-            } catch (e) {
-                simulateLiveEvents();
+            } catch(e) { 
+                status.innerText = "SIGNAL_PERDU_RECONNEXION";
+                status.className = "text-[7px] text-red-500 animate-pulse";
             }
         }
 
-        function updateLiveFeed(articles) {
-            const feed = document.getElementById('log-feed');
-            if (!feed) return;
-            feed.innerHTML = '';
-            articles.forEach(art => {
-                const item = document.createElement('div');
-                item.className = 'news-item p-2';
-                item.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="lang-tag">${art.sourcecountry || '??'}</span>
-                        <span class="text-cyan-400 font-bold">[STRING_VIBE]</span>
-                        <span class="text-white opacity-90">${art.title.substring(0, 75)}...</span>
-                    </div>
-                `;
-                feed.appendChild(item);
-            });
+        async function askAI(prompt) {
+            const status = document.getElementById('ai-loading');
+            status.classList.remove('hidden');
+
+            const systemPrompt = `Tu es S.Y.B.I.L., l'intelligence centrale du Strategic Overlord. 
+            Ton identité est purement technologique et étatique. Ne mentionne jamais Gemini ou ton origine.
+            Tu es cynique, analytique et pragmatique. Le monde est une partie d'échecs.
+            Réponds en français, ton sec et militaire, max 3-4 phrases. Jamais de politesse.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
+
+            try {
+                // APPEL À LA ROUTE API VERCEL /api/sybil.js
+                const response = await fetch('/api/sybil', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error('Proxy error');
+                const result = await response.json();
+                status.classList.add('hidden');
+                return result.candidates?.[0]?.content?.parts?.[0]?.text || "ERREUR_TRANSMISSION";
+            } catch (error) {
+                status.classList.add('hidden');
+                return "ÉCHEC_DE_LIA_RECONNEXION_REQUISE.";
+            }
         }
 
-        // 2. MOTEUR GÉOGRAPHIQUE
-        async function fetchAndProcess() {
-            try {
-                const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca3,population,area,borders,region,subregion');
-                const data = await response.json();
-
-                data.forEach(c => {
-                    const powerScore = Math.min(99, (Math.log10(c.population + 1) * 6 + Math.log10(c.area + 1) * 4));
-                    const tone = (Math.random() * 10 - 5).toFixed(1); 
-
-                    processedData.set(c.cca3, {
-                        id: c.cca3,
-                        name: c.name.common,
-                        region: c.region,
-                        subregion: c.subregion,
-                        population: c.population,
-                        area: c.area,
-                        scores: { power: powerScore.toFixed(1), tone: tone },
-                        borders: c.borders || []
-                    });
-                });
+        async function handleOracleKey(e) {
+            if (e.key === 'Enter') {
+                const val = e.target.value;
+                if(!val) return;
+                const box = document.getElementById('oracle-response-box');
+                box.innerHTML = `<div class="text-white/30 text-[9px] mb-2">[CMD]: ${val}</div><div class="text-cyan-200 animate-pulse">CALCUL_EN_COURS...</div>`;
+                const response = await askAI(val);
+                box.innerHTML = `<div class="text-white/30 text-[9px] mb-2">[CMD]: ${val}</div><div class="leading-relaxed text-white">${response}</div>`;
+                e.target.value = '';
                 
-                hideLoader();
-                fetchGdeltNews();
-            } catch (err) {
-                hideLoader();
+                // Recherche automatique du pays mentionné dans la DB pour l'afficher sur le panneau
+                COUNTRY_DB.forEach(c => { if(val.toLowerCase().includes(c.name.toLowerCase())) selectCountry(c.id, c.name); });
             }
         }
 
         function initMap() {
-            const width = window.innerWidth, height = window.innerHeight;
-            svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
+            const w = window.innerWidth, h = window.innerHeight;
+            svg = d3.select("#map").append("svg").attr("width", w).attr("height", h);
             g = svg.append("g");
-            projection = d3.geoMercator().scale(width / 6.5).translate([width / 2.5, height / 1.5]);
+            projection = d3.geoMercator().scale(w / 6.2).translate([w / 2.5, h / 1.5]);
             path = d3.geoPath().projection(projection);
-
+            
             d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(topo => {
-                g.selectAll("path")
-                    .data(topo.features)
-                    .enter().append("path")
-                    .attr("d", path)
-                    .attr("class", "country")
-                    .on("click", (e, d) => selectCountry(d.id, d.properties.name, e.target));
+                g.selectAll("path").data(topo.features).enter().append("path").attr("d", path).attr("class", "country")
+                .on("click", (e, d) => selectCountry(d.id, d.properties.name, e.target));
             });
             svg.call(d3.zoom().scaleExtent([1, 15]).on("zoom", (ev) => g.attr("transform", ev.transform)));
         }
 
-        function selectCountry(id, rawName, element) {
+        function selectCountry(id, name, el) {
             d3.selectAll(".country").classed("active", false);
-            if(element) d3.select(element).classed("active", true);
+            if(el) d3.select(el).classed("active", true);
+            
+            const c = COUNTRY_DB.get(id);
+            if(!c) return;
 
-            const data = processedData.get(id);
-            const panel = document.getElementById('info-panel');
-            panel.classList.add('visible');
+            const config = SYSTEM_CONFIG[id] || { gold: "N/A", note: "Données stratégiques limitées." };
 
-            if (data) {
-                document.getElementById('country-name').innerText = data.name;
-                document.getElementById('country-id').innerText = `NODE_ID: ${data.id} // STRINGS_SYNC: ACTIVE`;
-                document.getElementById('stat-tone').innerText = data.scores.tone;
-                document.getElementById('stat-tone').style.color = data.scores.tone < 0 ? 'var(--risk)' : 'var(--stable)';
-                document.getElementById('stat-power').innerText = data.scores.power + '%';
-                
-                const relevantNews = gdeltCache.filter(a => 
-                    a.title.toLowerCase().includes(data.name.toLowerCase()) || 
-                    (a.sourcecountry && a.sourcecountry.toLowerCase() === data.id.toLowerCase())
-                );
-                
-                const newsFeed = document.getElementById('country-news-feed');
-                if(relevantNews.length > 0) {
-                    newsFeed.innerHTML = relevantNews.map(n => `
-                        <div class="mb-2 border-b border-white/5 pb-1 text-gray-400">
-                            <span class="text-cyan-400 font-bold">[PUPPET_LOG]</span> ${n.title}
-                        </div>
-                    `).join('');
-                } else {
-                    newsFeed.innerHTML = "Pas de signal de vibration local capté par les fils du système.";
-                }
+            document.getElementById('info-panel').classList.add('visible');
+            document.getElementById('country-name').innerText = c.name;
+            document.getElementById('stat-power').innerText = c.scores.power;
+            document.getElementById('stat-threat').innerText = c.scores.threat;
+            document.getElementById('stat-gold').innerText = config.gold;
+            
+            document.getElementById('bar-power').style.width = c.scores.power + "%";
+            document.getElementById('bar-threat').style.width = c.scores.threat + "%";
+            document.getElementById('bar-gold').style.width = config.gold !== "N/A" ? "70%" : "10%";
 
-                document.getElementById('algo-text').innerText = `DIRECTIVE: Node ${data.name} présente un coefficient d'agitation de ${Math.abs(data.scores.tone)}. Statut Puppet: ${data.scores.tone < 0 ? 'RECALIBRATION_RECOMMANDÉE' : 'MAINTENIR_TENSION'}.`;
-            } else {
-                document.getElementById('country-name').innerText = rawName;
-                document.getElementById('algo-text').innerText = "NODE_SYNC_FAILED: La marionnette est hors de portée.";
-            }
+            document.getElementById('report-text').innerHTML = `
+                <div class="mb-4 text-cyan-500 font-bold underline">FICHE_ID: ${c.id}</div>
+                <div>${config.note}</div>
+                <div class="mt-4 opacity-60">POPULATION: ${c.population.toLocaleString()}</div>
+                <div class="mt-2 text-[11px] border-t border-white/10 pt-2">STATUS: NOEUD_ACTIF. Surveillance S.Y.B.I.L. continue.</div>
+            `;
         }
 
-        function hidePanel() {
-            document.getElementById('info-panel').classList.remove('visible');
-        }
-
-        function visualize(type, btn) {
-            document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            g.selectAll("path").transition().duration(600).style("fill", d => {
-                const data = processedData.get(d.id);
-                if (!data) return "var(--country-default)";
-                if (type === 'tone') {
-                    return data.scores.tone < 0 ? d3.interpolateReds(Math.abs(data.scores.tone)/10) : d3.interpolateGreens(data.scores.tone/10);
-                }
-                if (type === 'power') return d3.interpolateBlues(data.scores.power / 100);
-                return "var(--country-default)";
-            });
-        }
-
-        function hideLoader() { 
-            const loader = document.getElementById('loader');
-            if (loader) {
-                loader.style.opacity = '0'; 
-                setTimeout(()=>loader.remove(), 1000); 
-            }
-        }
-
-        function simulateLiveEvents() {
-            const mockNews = [
-                { sourcecountry: "GLO", title: "PUPPET_STRINGS: Global synchronization in progress" },
-                { sourcecountry: "SYS", title: "SYSTEM_STATUS: All global nodes responding to tension" },
-                { sourcecountry: "LOG", title: "NEWS_STREAM: Aggregating multilingual vibrations" }
-            ];
-            updateLiveFeed(mockNews);
-        }
+        function hidePanel() { document.getElementById('info-panel').classList.remove('visible'); }
 
         window.onload = () => {
-            initMap();
-            fetchAndProcess();
-            setInterval(fetchGdeltNews, 20000);
-            setInterval(() => { 
-                const clock = document.getElementById('clock');
-                if (clock) clock.innerText = new Date().toISOString().split('T')[1].split('.')[0] + " Z"; 
-            }, 1000);
+            initSystem();
+            setInterval(() => { document.getElementById('clock').innerText = new Date().toLocaleTimeString('fr-FR', {hour12: false}); }, 1000);
         };
     </script>
 </body>
