@@ -16,7 +16,7 @@ export default async function handler(req, res) {
         }
 
         try {
-            const response = await fetch("https://api.deepseek.com/chat/completions", {
+            const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
                 method: "POST",
                 headers: { 
                     "Content-Type": "application/json", 
@@ -36,19 +36,25 @@ export default async function handler(req, res) {
                 })
             });
 
-            const data = await response.json();
+            const text = await response.text();
 
-            // Vérification de la structure de la réponse DeepSeek
-            if (data && data.choices && data.choices[0] && data.choices[0].message) {
-                const analysis = data.choices[0].message.content;
-                return res.status(200).json({ analysis });
-            } else {
-                console.error("Structure de réponse API inattendue:", data);
-                return res.status(502).json({ 
-                    error: "Données invalides", 
-                    analysis: "Le serveur a renvoyé un format de données illisible." 
+            if (!response.ok) {
+                return res.status(response.status).json({
+                    error: "Erreur API DeepSeek",
+                    analysis: text
                 });
             }
+
+            const data = JSON.parse(text);
+
+            if (data?.choices?.[0]?.message?.content) {
+                return res.status(200).json({ analysis: data.choices[0].message.content });
+            }
+
+            return res.status(502).json({ 
+                error: "Données invalides", 
+                analysis: "Le serveur a renvoyé un format de données illisible." 
+            });
 
         } catch (error) {
             console.error("Erreur Proxy DeepSeek:", error);
