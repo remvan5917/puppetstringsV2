@@ -3,289 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Puppet Strings | Strategic Intelligence Terminal</title>
+    <title>The Puppet Strings | Strategic Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@300;500&display=swap');
-
-        :root {
-            --primary: #00f2ff;
-            --primary-dim: rgba(0, 242, 255, 0.3);
-            --bg: #010204;
-            --panel: rgba(2, 6, 12, 0.9);
-            --stealth: #1e293b;
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@300;500&display=swap');
+        
+        :root { 
+            --primary: #00f2ff; 
+            --bg: #010204; 
+            --panel: rgba(2, 6, 12, 0.98); 
         }
 
-        body {
-            background-color: var(--bg);
-            color: #e2e8f0;
-            margin: 0;
-            overflow: hidden;
-            font-family: 'JetBrains Mono', monospace;
-            width: 100vw;
-            height: 100vh;
+        body { 
+            background: var(--bg); 
+            color: #e2e8f0; 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'JetBrains Mono', monospace; 
         }
 
         .orbitron { font-family: 'Orbitron', sans-serif; }
 
-        body::after {
-            content: "";
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
-            background-size: 100% 2px, 3px 100%;
-            pointer-events: none;
-            z-index: 1000;
+        .map-container { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            z-index: 1; 
+            background: #010204; 
         }
 
-        .map-container {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1;
-            background-color: #010204;
-            cursor: crosshair;
-        }
-
-        .grid-bg { fill: none; stroke: rgba(0, 242, 255, 0.03); stroke-width: 0.5; }
-
-        .country {
-            fill: #080c14;
-            stroke: #1e293b;
-            stroke-width: 0.5;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            outline: none;
+        .country { 
+            fill: #080c14; 
+            stroke: #1e293b; 
+            stroke-width: 0.5; 
+            transition: all 0.3s ease; 
+            cursor: crosshair; 
+            outline: none; 
         }
 
         .country:hover { 
             fill: #111a2e; 
             stroke: var(--primary); 
-            filter: drop-shadow(0 0 5px var(--primary-dim));
+            filter: drop-shadow(0 0 5px var(--primary));
         }
 
-        .country.active {
-            fill: rgba(0, 242, 255, 0.1);
-            stroke: var(--primary);
-            stroke-width: 1.2;
-            animation: pulse-border 2s infinite;
+        .country.active { 
+            fill: rgba(0, 242, 255, 0.15); 
+            stroke: var(--primary); 
+            stroke-width: 1.5; 
         }
 
-        @keyframes pulse-border {
-            0% { stroke-opacity: 1; }
-            50% { stroke-opacity: 0.4; }
-            100% { stroke-opacity: 1; }
+        .panel { 
+            pointer-events: auto; 
+            background: var(--panel); 
+            backdrop-filter: blur(15px); 
+            border: 1px solid rgba(0, 242, 255, 0.1); 
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
         }
 
-        .panel {
-            pointer-events: auto;
-            background: var(--panel);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 242, 255, 0.1);
-            box-shadow: 0 0 50px rgba(0,0,0,0.9);
+        #overlay { 
+            position: fixed; 
+            inset: 0; 
+            background: #000; 
+            z-index: 2000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: opacity 0.8s ease; 
         }
 
-        .ticker-wrap {
-            position: absolute; bottom: 0; width: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            border-top: 1px solid rgba(0, 242, 255, 0.3);
-            padding: 8px 0; z-index: 200; overflow: hidden;
-        }
-
-        .ticker-content { display: flex; white-space: nowrap; animation: ticker-scrolling 80s linear infinite; }
-        .ticker-item { font-size: 10px; text-transform: uppercase; color: var(--primary); letter-spacing: 2px; margin-right: 100px; opacity: 0.8; }
-
-        @keyframes ticker-scrolling { from { transform: translateX(100%); } to { transform: translateX(-100%); } }
-
-        #audio-init-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #000; z-index: 2000;
-            display: flex; justify-content: center; align-items: center;
-        }
-
-        .scanline {
-            width: 100%; height: 10px;
-            background: rgba(0, 242, 255, 0.03);
-            position: absolute; top: 0; left: 0;
-            animation: scan 8s linear infinite;
-            pointer-events: none; z-index: 5;
-        }
-
-        @keyframes scan { from { top: -10%; } to { top: 110%; } }
-        .custom-scrollbar::-webkit-scrollbar { width: 2px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--primary); }
-
-        .control-btn {
-            width: 40px; height: 40px;
-            background: var(--panel); border: 1px solid rgba(0, 242, 255, 0.2);
-            color: var(--primary); display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: all 0.3s;
-            clip-path: polygon(10% 0, 100% 0, 100% 90%, 90% 100%, 0 100%, 0 10%);
-        }
-
-        .control-btn:hover { background: var(--primary); color: black; box-shadow: 0 0 15px var(--primary); }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="audio-init-overlay">
-        <div class="panel p-16 text-center border-t-2 border-cyan-500 max-w-2xl relative overflow-hidden bg-[#05070a]">
-            <h2 class="orbitron text-6xl text-white mb-4 font-black italic tracking-tighter">PUPPET_STRINGS</h2>
-            <p class="text-[10px] text-cyan-500 mb-12 tracking-[0.8em] uppercase font-bold opacity-60">SECURE_PROXY_ENABLED // VER 5.0</p>
-            <button id="init-btn" onclick="initTerminal()" class="group relative px-16 py-5 overflow-hidden">
-                <div class="absolute inset-0 bg-cyan-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-500"></div>
-                <span class="relative orbitron text-cyan-500 group-hover:text-black font-bold tracking-[0.3em] transition-colors duration-500">ACCÉDER AU RÉSEAU</span>
-                <div class="absolute inset-0 border border-cyan-500"></div>
+    <div id="overlay">
+        <div class="panel p-16 text-center border-t-2 border-cyan-500 max-w-xl">
+            <h2 class="orbitron text-5xl text-white mb-8 font-black italic tracking-tighter">PUPPET_STRINGS</h2>
+            <p class="text-[10px] text-cyan-500/60 mb-12 tracking-[0.5em] uppercase font-bold">Terminal de Renseignement Stratégique</p>
+            <button onclick="init()" class="group relative border border-cyan-500 px-12 py-5 text-cyan-500 hover:text-black transition-all duration-500 orbitron font-bold overflow-hidden">
+                <span class="relative z-10">INITIALISER LA LIAISON</span>
+                <div class="absolute inset-0 bg-cyan-500 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
             </button>
         </div>
     </div>
 
-    <div id="tooltip" class="absolute hidden bg-black/90 border border-cyan-500/50 text-cyan-400 px-4 py-2 text-[10px] orbitron font-bold z-[1000] pointer-events-none backdrop-blur-md"></div>
     <div id="map" class="map-container"></div>
-    
-    <div class="absolute bottom-24 right-10 z-[100] flex flex-col gap-3">
-        <button class="control-btn" id="zoom-in">+</button>
-        <button class="control-btn" id="zoom-out">-</button>
-        <button class="control-btn" id="zoom-reset">⟲</button>
-    </div>
 
-    <div class="ticker-wrap">
-        <div class="ticker-content" id="news-ticker-container">
-            <span class="ticker-item">INITIALISATION DU FLUX SÉCURISÉ...</span>
+    <div class="absolute top-0 left-0 w-full p-10 pointer-events-none z-50 flex justify-between items-start">
+        <div class="panel p-6 border-l-4 border-cyan-500">
+            <h1 class="text-2xl font-black orbitron text-white tracking-tighter">NETWORK_ACCESS</h1>
+            <div class="flex items-center gap-2 mt-1">
+                <span class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
+                <span class="text-[10px] text-cyan-500/80 font-bold uppercase tracking-widest">Proxy: DeepSeek_Secure</span>
+            </div>
+        </div>
+        <div class="panel px-8 py-4 text-right">
+            <p id="clock" class="text-xl text-cyan-500 font-mono font-bold leading-none">--:--:-- Z</p>
         </div>
     </div>
 
-    <div class="ui-overlay absolute top-0 left-0 w-full h-full pointer-events-none z-50">
-        <div class="p-10 flex justify-between items-start w-full">
-            <div class="panel p-6 border-l-4 border-cyan-500">
-                <h1 class="text-3xl font-black orbitron tracking-tighter text-white italic">STRAT_INTEL</h1>
-                <div class="flex items-center gap-4">
-                    <span id="engine-badge" class="text-[8px] text-green-500 font-bold border border-green-500/30 px-2 py-0.5 uppercase tracking-tighter">PROXY: ACTIVE_AND_SECURED</span>
-                </div>
-            </div>
-            <div class="panel px-8 py-5 text-right">
-                <p id="live-time" class="text-xl text-cyan-500 font-bold tracking-[0.1em] font-mono leading-none">--:--:-- Z</p>
-            </div>
+    <div id="info" class="absolute right-10 top-32 bottom-20 w-[450px] panel p-10 hidden flex flex-col pointer-events-auto z-50">
+        <div class="flex justify-between items-start mb-10">
+            <h2 id="c-name" class="orbitron text-4xl text-white font-black uppercase italic leading-none"></h2>
+            <button onclick="closeInfo()" class="text-gray-600 hover:text-white transition-colors">✕</button>
         </div>
 
-        <div class="absolute left-10 top-44 flex flex-col gap-8 pointer-events-auto">
-            <div class="panel p-6 w-80">
-                <p class="text-[10px] text-gray-400 orbitron mb-4 tracking-widest uppercase">Recherche</p>
-                <input type="text" id="search-input" placeholder="NOM DU PAYS..." class="bg-black/40 border border-white/10 p-4 text-[11px] text-white w-full outline-none focus:border-cyan-500 font-mono">
-            </div>
-
-            <div class="panel p-6 w-80 h-[380px] flex flex-col">
-                <p class="text-[10px] text-gray-400 orbitron mb-4 tracking-widest uppercase">Journal Système</p>
-                <div id="ai-log" class="text-[10px] text-cyan-900/60 font-mono flex-1 overflow-hidden flex flex-col-reverse leading-loose"></div>
-            </div>
-        </div>
-
-        <div class="absolute right-10 top-10 bottom-36 flex pointer-events-auto">
-            <div id="country-info" class="panel w-[500px] p-12 hidden flex flex-col h-full border-r-4 border-r-cyan-500">
-                <div class="flex justify-between items-start mb-12">
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-4">
-                            <img id="country-flag" src="" class="w-14 h-8 object-cover border border-white/20">
-                            <span class="text-[10px] text-cyan-400 font-black tracking-[0.4em]" id="iso-code">---</span>
-                        </div>
-                        <h2 id="selected-name" class="text-5xl font-black orbitron italic text-white uppercase leading-none"></h2>
-                    </div>
-                    <button onclick="closePanel()" class="text-gray-600 hover:text-white transition-all">✕</button>
-                </div>
+        <div class="flex-1 overflow-y-auto space-y-8 pr-4">
+            <div class="bg-black/40 border border-cyan-500/10 p-8 relative">
+                <div id="status-indicator" class="text-[9px] text-cyan-500 font-bold mb-4 uppercase tracking-[0.3em]">En attente de sélection...</div>
+                <div id="loader" class="absolute top-0 left-0 h-[1px] bg-cyan-500 w-0 transition-all duration-1000"></div>
                 
-                <div class="flex-1 overflow-y-auto space-y-10 pr-6 custom-scrollbar">
-                    <div id="intel-box" class="bg-[#0a0f18] border border-cyan-500/20 p-10">
-                        <div id="intel-loader" class="hidden h-0.5 bg-cyan-500 mb-4 transition-all"></div>
-                        <h4 class="text-[11px] text-cyan-500 font-bold uppercase mb-4 tracking-[0.4em]">Analyse Backend</h4>
-                        <p id="intel-text" class="text-[14px] leading-relaxed text-slate-300 font-light italic">
-                            Sélectionnez une cible pour lancer l'analyse via le proxy sécurisé...
-                        </p>
-                    </div>
-                </div>
+                <p id="c-intel" class="text-sm leading-relaxed text-slate-300 italic font-light">
+                    Sélectionnez une zone géographique sur la carte pour générer un rapport de renseignement via le proxy DeepSeek.
+                </p>
             </div>
         </div>
     </div>
 
-    <script type="module">
-        // Le frontend n'a PLUS de clés API ici. 
-        // Il appelle simplement les routes de VOTRE serveur.
-        const API_BASE = window.location.origin + "/api"; 
+    <script>
+        let svg, g, projection, path;
+        const width = window.innerWidth, height = window.innerHeight;
 
-        let worldData;
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        const svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
-        const container = svg.append("g");
-        const gMap = container.append("g");
-        const projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
-        const path = d3.geoPath().projection(projection);
-
-        const zoom = d3.zoom().scaleExtent([0.5, 15]).on("zoom", (event) => {
-            container.attr("transform", event.transform);
-        });
-        svg.call(zoom);
-
-        d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
-            worldData = data;
-            gMap.selectAll("path").data(data.features).enter().append("path")
-                .attr("d", path).attr("class", "country")
-                .on("click", (e, d) => selectCountry(d));
-            logMessage("RÉSEAU CARTOGRAPHIQUE PRÊT.");
-        });
-
-        window.initTerminal = () => {
-            document.getElementById('audio-init-overlay').classList.add('opacity-0');
-            setTimeout(() => document.getElementById('audio-init-overlay').style.display = 'none', 500);
-            fetchNews();
-        };
-
-        async function fetchNews() {
-            try {
-                // On appelle notre route backend sécurisée
-                const res = await fetch(`${API_BASE}/news`);
-                const data = await res.json();
-                if(data.articles) {
-                    document.getElementById('news-ticker-container').innerHTML = data.articles.map(a => 
-                        `<span class="ticker-item">${a.title.toUpperCase()}</span>`
-                    ).join("");
-                }
-            } catch(e) { logMessage("ERREUR: FLUX NEWS INDISPONIBLE."); }
+        function init() {
+            document.getElementById('overlay').style.opacity = '0';
+            setTimeout(() => document.getElementById('overlay').remove(), 800);
+            setupMap();
+            setInterval(() => { 
+                document.getElementById('clock').innerText = new Date().toLocaleTimeString('fr-FR', { timeZone: 'UTC' }) + " Z"; 
+            }, 1000);
         }
 
-        async function selectCountry(feature) {
-            const name = feature.properties.name;
+        function setupMap() {
+            svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
+            g = svg.append("g");
+            projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
+            path = d3.geoPath().projection(projection);
+
+            d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
+                g.selectAll("path").data(data.features).enter().append("path")
+                    .attr("d", path).attr("class", "country")
+                    .on("click", (event, d) => selectCountry(event, d));
+            });
+            svg.call(d3.zoom().scaleExtent([0.8, 12]).on("zoom", (e) => g.attr("transform", e.transform)));
+        }
+
+        async function selectCountry(event, d) {
+            const name = d.properties.name;
             d3.selectAll(".country").classed("active", false);
             d3.select(event.currentTarget).classed("active", true);
             
-            document.getElementById('country-info').classList.remove('hidden');
-            document.getElementById('selected-name').innerText = name;
-            document.getElementById('iso-code').innerText = feature.id;
-            document.getElementById('intel-text').innerText = "Appel du serveur proxy...";
+            document.getElementById('info').classList.remove('hidden');
+            document.getElementById('c-name').innerText = name;
+            document.getElementById('c-intel').innerText = "ÉTABLISSEMENT DE LA LIAISON SÉCURISÉE...";
+            document.getElementById('status-indicator').innerText = "Décryptage DeepSeek en cours...";
+            document.getElementById('loader').style.width = "100%";
 
             try {
-                // APPEL AU BACKEND SÉCURISÉ POUR L'ANALYSE IA
-                const res = await fetch(`${API_BASE}/intel`, {
+                const response = await fetch("/api/index", {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ country: name, borders: feature.id })
+                    body: JSON.stringify({ country: name })
                 });
-                const data = await res.json();
-                document.getElementById('intel-text').innerText = data.analysis;
-                logMessage(`ANALYSE COMPLÉTÉE POUR ${name.toUpperCase()}`);
-            } catch(e) {
-                document.getElementById('intel-text').innerText = "Échec de connexion au serveur sécurisé.";
+                const data = await response.json();
+                document.getElementById('c-intel').innerText = data.analysis || "Aucune donnée.";
+                document.getElementById('status-indicator').innerText = "Rapport complété";
+            } catch (error) {
+                document.getElementById('c-intel').innerText = "ERREUR : Liaison interrompue.";
+            } finally {
+                setTimeout(() => { document.getElementById('loader').style.width = "0%"; }, 500);
             }
         }
 
-        function logMessage(msg) {
-            const log = document.getElementById('ai-log');
-            const div = document.createElement('div');
-            div.innerText = `[${new Date().toLocaleTimeString()}] > ${msg}`;
-            log.prepend(div);
+        function closeInfo() {
+            document.getElementById('info').classList.add('hidden');
+            d3.selectAll(".country").classed("active", false);
         }
-
-        setInterval(() => { document.getElementById('live-time').innerText = new Date().toLocaleTimeString() + " Z"; }, 1000);
-        window.closePanel = () => document.getElementById('country-info').classList.add('hidden');
     </script>
 </body>
 </html>
