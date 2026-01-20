@@ -1,186 +1,117 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Puppet Strings | Strategic Intelligence</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=JetBrains+Mono:wght@300;500&display=swap');
+export default async function handler(req, res) {
+    if (req.method === 'POST') {
+        const { country } = req.body;
         
-        :root { 
-            --primary: #00f2ff; 
-            --bg: #010204; 
-            --panel: rgba(2, 6, 12, 0.98); 
+        if (!country) {
+            return res.status(400).json({ error: "Cible non identifiée." });
         }
 
-        body { 
-            background: var(--bg); 
-            color: #e2e8f0; 
-            margin: 0; 
-            overflow: hidden; 
-            font-family: 'JetBrains Mono', monospace; 
-        }
+        try {
+            // 1. COLLECTE DES VECTEURS D'INFLUENCE (RestCountries)
+            const countryRes = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(country)}?fullText=true`);
+            if (!countryRes.ok) throw new Error("Accès base de données pays impossible.");
+            const countryData = (await countryRes.json())[0];
 
-        .orbitron { font-family: 'Orbitron', sans-serif; }
-
-        .map-container { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 100%; height: 100%; 
-            z-index: 1; 
-            background: #010204; 
-        }
-
-        .country { 
-            fill: #080c14; 
-            stroke: #1e293b; 
-            stroke-width: 0.5; 
-            transition: all 0.3s ease; 
-            cursor: crosshair; 
-            outline: none; 
-        }
-
-        .country:hover { 
-            fill: #111a2e; 
-            stroke: var(--primary); 
-            filter: drop-shadow(0 0 5px var(--primary));
-        }
-
-        .country.active { 
-            fill: rgba(0, 242, 255, 0.15); 
-            stroke: var(--primary); 
-            stroke-width: 1.5; 
-        }
-
-        .panel { 
-            pointer-events: auto; 
-            background: var(--panel); 
-            backdrop-filter: blur(15px); 
-            border: 1px solid rgba(0, 242, 255, 0.1); 
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-        }
-
-        #overlay { 
-            position: fixed; 
-            inset: 0; 
-            background: #000; 
-            z-index: 2000; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            transition: opacity 0.8s ease; 
-        }
-
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
-    </style>
-</head>
-<body>
-
-    <div id="overlay">
-        <div class="panel p-16 text-center border-t-2 border-cyan-500 max-w-xl">
-            <h2 class="orbitron text-5xl text-white mb-8 font-black italic tracking-tighter">PUPPET_STRINGS</h2>
-            <p class="text-[10px] text-cyan-500/60 mb-12 tracking-[0.5em] uppercase font-bold">Terminal de Renseignement Stratégique</p>
-            <button onclick="init()" class="group relative border border-cyan-500 px-12 py-5 text-cyan-500 hover:text-black transition-all duration-500 orbitron font-bold overflow-hidden">
-                <span class="relative z-10">INITIALISER LA LIAISON</span>
-                <div class="absolute inset-0 bg-cyan-500 transform translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-            </button>
-        </div>
-    </div>
-
-    <div id="map" class="map-container"></div>
-
-    <div class="absolute top-0 left-0 w-full p-10 pointer-events-none z-50 flex justify-between items-start">
-        <div class="panel p-6 border-l-4 border-cyan-500">
-            <h1 class="text-2xl font-black orbitron text-white tracking-tighter">NETWORK_ACCESS</h1>
-            <div class="flex items-center gap-2 mt-1">
-                <span class="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></span>
-                <span class="text-[10px] text-cyan-500/80 font-bold uppercase tracking-widest">Proxy: DeepSeek_Secure</span>
-            </div>
-        </div>
-        <div class="panel px-8 py-4 text-right">
-            <p id="clock" class="text-xl text-cyan-500 font-mono font-bold leading-none">--:--:-- Z</p>
-        </div>
-    </div>
-
-    <div id="info" class="absolute right-10 top-32 bottom-20 w-[450px] panel p-10 hidden flex flex-col pointer-events-auto z-50">
-        <div class="flex justify-between items-start mb-10">
-            <h2 id="c-name" class="orbitron text-4xl text-white font-black uppercase italic leading-none"></h2>
-            <button onclick="closeInfo()" class="text-gray-600 hover:text-white transition-colors">✕</button>
-        </div>
-
-        <div class="flex-1 overflow-y-auto space-y-8 pr-4">
-            <div class="bg-black/40 border border-cyan-500/10 p-8 relative">
-                <div id="status-indicator" class="text-[9px] text-cyan-500 font-bold mb-4 uppercase tracking-[0.3em]">En attente de sélection...</div>
-                <div id="loader" class="absolute top-0 left-0 h-[1px] bg-cyan-500 w-0 transition-all duration-1000"></div>
-                
-                <p id="c-intel" class="text-sm leading-relaxed text-slate-300 italic font-light">
-                    Sélectionnez une zone géographique sur la carte pour générer un rapport de renseignement via le proxy DeepSeek.
-                </p>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let svg, g, projection, path;
-        const width = window.innerWidth, height = window.innerHeight;
-
-        function init() {
-            document.getElementById('overlay').style.opacity = '0';
-            setTimeout(() => document.getElementById('overlay').remove(), 800);
-            setupMap();
-            setInterval(() => { 
-                document.getElementById('clock').innerText = new Date().toLocaleTimeString('fr-FR', { timeZone: 'UTC' }) + " Z"; 
-            }, 1000);
-        }
-
-        function setupMap() {
-            svg = d3.select("#map").append("svg").attr("width", width).attr("height", height);
-            g = svg.append("g");
-            projection = d3.geoMercator().scale(width / 6.5).translate([width / 2, height / 1.5]);
-            path = d3.geoPath().projection(projection);
-
-            d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
-                g.selectAll("path").data(data.features).enter().append("path")
-                    .attr("d", path).attr("class", "country")
-                    .on("click", (event, d) => selectCountry(event, d));
-            });
-            svg.call(d3.zoom().scaleExtent([0.8, 12]).on("zoom", (e) => g.attr("transform", e.transform)));
-        }
-
-        async function selectCountry(event, d) {
-            const name = d.properties.name;
-            d3.selectAll(".country").classed("active", false);
-            d3.select(event.currentTarget).classed("active", true);
+            // 2. EXTRACTION DES DONNÉES DE PUISSANCE
+            const pop = countryData.population;
+            const borders = countryData.borders || [];
+            const area = countryData.area;
+            const region = countryData.region;
+            const subregion = countryData.subregion;
+            const languages = countryData.languages ? Object.values(countryData.languages) : [];
+            const latlng = countryData.latlng || [0, 0];
             
-            document.getElementById('info').classList.remove('hidden');
-            document.getElementById('c-name').innerText = name;
-            document.getElementById('c-intel').innerText = "ÉTABLISSEMENT DE LA LIAISON SÉCURISÉE...";
-            document.getElementById('status-indicator').innerText = "Décryptage DeepSeek en cours...";
-            document.getElementById('loader').style.width = "100%";
-
-            try {
-                const response = await fetch("/api/index", {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ country: name })
-                });
-                const data = await response.json();
-                document.getElementById('c-intel').innerText = data.analysis || "Aucune donnée.";
-                document.getElementById('status-indicator').innerText = "Rapport complété";
-            } catch (error) {
-                document.getElementById('c-intel').innerText = "ERREUR : Liaison interrompue.";
-            } finally {
-                setTimeout(() => { document.getElementById('loader').style.width = "0%"; }, 500);
+            // 3. ALGORITHME DE SCORING GÉOPOLITIQUE (Puppet Master v4.1 Enhanced)
+            
+            // A. Classification Rigoureuse des Blocs
+            let influenceBloc = "AUTONOME / NON-ALIGNÉ";
+            let powerColor = "⚪";
+            
+            const westernSubregions = ["Western Europe", "Northern Europe", "Southern Europe", "Northern America"];
+            const bricsMembers = ["Russia", "China", "India", "Brazil", "South Africa", "Iran", "Egypt", "Ethiopia", "United Arab Emirates"];
+            
+            if (westernSubregions.includes(subregion) || ["Australia", "New Zealand", "Japan", "South Korea"].includes(country)) {
+                influenceBloc = "BLOC OCCIDENTAL (OTAN/PARTENAIRES)";
+                powerColor = "🔵";
+            } else if (bricsMembers.includes(country) || ["Belarus", "Central Asia"].includes(subregion)) {
+                influenceBloc = "ALLIANCE EURASIENNE / BRICS+";
+                powerColor = "🔴";
+            } else if (["Middle Africa", "Western Africa", "Eastern Africa"].includes(subregion)) {
+                influenceBloc = "SUD GLOBAL (INFLUENCE MULTIPOLAIRE)";
+                powerColor = "🟡";
+            } else if (["South America", "Central America"].includes(subregion)) {
+                influenceBloc = "ZONE D'INFLUENCE AMÉRICAINE / SUD GLOBAL";
+                powerColor = "🟠";
             }
-        }
 
-        function closeInfo() {
-            document.getElementById('info').classList.add('hidden');
-            d3.selectAll(".country").classed("active", false);
+            // B. Analyse de la Profondeur Stratégique
+            const density = pop / area;
+            // Indice de Puissance (IPP) : Poids relatif territoire/population
+            const powerIndex = (Math.log10(pop) * 0.4 + Math.log10(area) * 0.6).toFixed(2);
+            
+            // C. Évaluation de la Menace Frontalière (Friction Systémique)
+            const frictionScore = (borders.length * 1.5).toFixed(1);
+            
+            // D. Détermination du Risque Géopolitique
+            let conflictRisk = "STABLE";
+            let strategyNote = "Maintien du statu quo.";
+            
+            if (borders.length >= 7 || (borders.length >= 4 && density > 250)) {
+                conflictRisk = "HAUTE FRAGILITÉ (ENCLAVEMENT)";
+                strategyNote = "Risque élevé de débordement transfrontalier ou d'instabilité interne.";
+            } else if (powerIndex > 7.5) {
+                conflictRisk = "PUISSANCE RÉGIONALE / HÉGÉMON";
+                strategyNote = "Capacité de projection et d'influence majeure sur les pays limitrophes.";
+            }
+
+            // 4. RÉDACTION DU RAPPORT TECHNIQUE AVANCÉ
+            const analysis = `
+╔════════════════════════════════════════════════════════╗
+  DOSSIER DE RENSEIGNEMENT STRATÉGIQUE : UNITÉ PUPPET
+  SYSTÈME DE SURVEILLANCE MONDIAL // ACCÈS NIVEAU 4
+╚════════════════════════════════════════════════════════╝
+
+[IDENTIFICATION DE LA CIBLE]
+> NOM : ${country.toUpperCase()}
+> COORDONNÉES : ${latlng[0].toFixed(2)}N, ${latlng[1].toFixed(2)}E
+> POLARITÉ : ${powerColor} ${influenceBloc}
+> RISQUE SYSTÉMIQUE : ${conflictRisk}
+
+[1. PARAMÈTRES DE PUISSANCE ÉTATIQUE]
+> Indice de Profondeur Stratégique : ${powerIndex} / 10
+> Démographie Active : ${(pop / 1000000).toFixed(2)}M d'unités
+> Contrôle Spatial : ${area.toLocaleString()} km²
+> Densité de Pression : ${density.toFixed(1)} hab/km²
+
+[2. VECTEURS D'INTERACTION & FRICTION]
+> Axes de pénétration (Frontières) : ${borders.length} points de contact
+> Voisinage immédiat : ${borders.length > 0 ? borders.join(', ') : 'ISOLEMENT GÉOGRAPHIQUE'}
+> Score de Friction Systémique : ${frictionScore} / 15
+> Sphère d'influence : ${subregion.toUpperCase()}
+
+[3. ANALYSE DE LA DOCTRINE & VULNÉRABILITÉS]
+${strategyNote}
+L'analyse structurale indique que ${country} possède une ${area > 1000000 ? 'profondeur stratégique majeure permettant d\'absorber des chocs externes' : 'profondeur limitée, rendant le territoire vulnérable aux manœuvres rapides'}. 
+La position géographique ${borders.length > 5 ? 'place le pays au cœur de tensions multilatérales complexes' : 'offre une protection relative contre les pressions frontalières directes'}.
+L'influence linguistique (${languages.slice(0, 2).join(', ')}) constitue un vecteur de soft-power facilitant des ponts diplomatiques vers d'autres zones d'intérêt stratégique.
+
+[4. ÉTAT DES FLUX]
+> Statut Infrastructure : ${pop > 50000000 ? 'RÉSEAU SATURÉ (CRITIQUE)' : 'RÉSEAU FLUIDE'}
+> Priorité d'Interception : ${powerIndex > 7 ? 'ALPHA (PRIORITAIRE)' : 'GAMMA (OBSERVATION)'}
+
+[STATUS] : ANALYSE VALIDÉE PAR L'ALGORITHME V4.1
+[SIGNATURE : SECTION_R_STRAT // PUPPET_MASTER]
+            `.trim();
+
+            return res.status(200).json({ analysis });
+
+        } catch (error) {
+            return res.status(500).json({ 
+                error: "Défaut de liaison", 
+                analysis: `[ERREUR CRITIQUE] : Interception impossible. La cible ${country} est protégée par un brouillage ou hors réseau.` 
+            });
         }
-    </script>
-</body>
-</html>
+    }
+
+    return res.status(405).json({ error: "Méthode non autorisée" });
+}
