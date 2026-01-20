@@ -1,117 +1,339 @@
-export default async function handler(req, res) {
-    if (req.method === 'POST') {
-        const { country } = req.body;
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUPPET STRINGS | GLOBAL COMMAND</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;500;700&family=Orbitron:wght@400;900&display=swap');
         
-        if (!country) {
-            return res.status(400).json({ error: "Cible non identifiée." });
+        :root { 
+            --primary: #00f2ff; 
+            --accent: #ff0055;
+            --bg: #020408; 
+            --panel-bg: rgba(5, 10, 20, 0.95);
         }
 
-        try {
-            // 1. COLLECTE DES VECTEURS D'INFLUENCE (RestCountries)
-            const countryRes = await fetch(`https://restcountries.com/v3.1/name/${encodeURIComponent(country)}?fullText=true`);
-            if (!countryRes.ok) throw new Error("Accès base de données pays impossible.");
-            const countryData = (await countryRes.json())[0];
+        body { 
+            background: var(--bg); 
+            color: var(--primary); 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Fira Code', monospace;
+            text-transform: uppercase;
+        }
 
-            // 2. EXTRACTION DES DONNÉES DE PUISSANCE
-            const pop = countryData.population;
-            const borders = countryData.borders || [];
-            const area = countryData.area;
-            const region = countryData.region;
-            const subregion = countryData.subregion;
-            const languages = countryData.languages ? Object.values(countryData.languages) : [];
-            const latlng = countryData.latlng || [0, 0];
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+
+        /* Overlay de balayage cathodique (Scanlines) */
+        body::before {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.04));
+            z-index: 1000;
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .map-container { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            z-index: 1; 
+        }
+
+        .country { 
+            fill: #0a1120; 
+            stroke: #1a2e4c; 
+            stroke-width: 0.8; 
+            transition: all 0.2s ease; 
+            cursor: crosshair;
+        }
+
+        .country:hover { 
+            fill: #162a4a; 
+            stroke: var(--primary);
+            filter: drop-shadow(0 0 8px var(--primary));
+        }
+
+        .country.active { 
+            fill: rgba(0, 242, 255, 0.2); 
+            stroke: var(--primary); 
+            stroke-width: 2; 
+        }
+
+        .terminal-border {
+            border: 1px solid rgba(0, 242, 255, 0.3);
+            position: relative;
+        }
+
+        .terminal-border::before {
+            content: '';
+            position: absolute;
+            top: -2px; left: -2px; width: 10px; height: 10px;
+            border-top: 2px solid var(--primary); border-left: 2px solid var(--primary);
+        }
+
+        .terminal-border::after {
+            content: '';
+            position: absolute;
+            bottom: -2px; right: -2px; width: 10px; height: 10px;
+            border-bottom: 2px solid var(--primary); border-right: 2px solid var(--primary);
+        }
+
+        #info-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+            transform: translateX(110%);
+        }
+
+        #info-panel.visible { transform: translateX(0); }
+
+        .glitch-text { animation: glitch 2s infinite; }
+        @keyframes glitch {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            51% { opacity: 1; text-shadow: 2px 0 var(--accent); }
+            52% { text-shadow: none; }
+        }
+
+        .loader-bar {
+            height: 2px;
+            background: var(--primary);
+            width: 0;
+            box-shadow: 0 0 10px var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 242, 255, 0.05);
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Overlay de démarrage système -->
+    <div id="overlay" class="fixed inset-0 bg-black z-[2000] flex items-center justify-center">
+        <div class="text-center">
+            <h1 class="orbitron text-6xl font-black mb-4 tracking-[0.2em] glitch-text italic">PUPPET_STRINGS</h1>
+            <p class="text-[10px] tracking-[1em] mb-12 text-cyan-500/50 uppercase">Satellite Intelligence Network v4.2</p>
+            <button onclick="bootSystem()" class="terminal-border px-10 py-4 hover:bg-cyan-500/10 transition-all group pointer-events-auto">
+                <span class="group-hover:tracking-widest transition-all">ACCÉDER AU TERMINAL</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Conteneur de la carte D3 -->
+    <div id="map" class="map-container"></div>
+
+    <!-- Interface HUD (Heads-Up Display) -->
+    <div class="fixed top-0 left-0 w-full h-full pointer-events-none z-50 flex flex-col justify-between p-6">
+        <!-- Header HUD -->
+        <div class="flex justify-between items-start">
+            <div class="terminal-border p-4 bg-black/60 pointer-events-auto">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 border border-cyan-500/30 flex items-center justify-center">
+                        <div class="w-2 h-2 bg-cyan-500 animate-ping"></div>
+                    </div>
+                    <div>
+                        <h2 class="orbitron text-xl font-bold leading-none">STRAT_NET</h2>
+                        <p class="text-[8px] mt-1 text-cyan-500/60 uppercase">Opérationnel // Localisation: UTC</p>
+                    </div>
+                </div>
+            </div>
             
-            // 3. ALGORITHME DE SCORING GÉOPOLITIQUE (Puppet Master v4.1 Enhanced)
-            
-            // A. Classification Rigoureuse des Blocs
-            let influenceBloc = "AUTONOME / NON-ALIGNÉ";
-            let powerColor = "⚪";
-            
-            const westernSubregions = ["Western Europe", "Northern Europe", "Southern Europe", "Northern America"];
-            const bricsMembers = ["Russia", "China", "India", "Brazil", "South Africa", "Iran", "Egypt", "Ethiopia", "United Arab Emirates"];
-            
-            if (westernSubregions.includes(subregion) || ["Australia", "New Zealand", "Japan", "South Korea"].includes(country)) {
-                influenceBloc = "BLOC OCCIDENTAL (OTAN/PARTENAIRES)";
-                powerColor = "🔵";
-            } else if (bricsMembers.includes(country) || ["Belarus", "Central Asia"].includes(subregion)) {
-                influenceBloc = "ALLIANCE EURASIENNE / BRICS+";
-                powerColor = "🔴";
-            } else if (["Middle Africa", "Western Africa", "Eastern Africa"].includes(subregion)) {
-                influenceBloc = "SUD GLOBAL (INFLUENCE MULTIPOLAIRE)";
-                powerColor = "🟡";
-            } else if (["South America", "Central America"].includes(subregion)) {
-                influenceBloc = "ZONE D'INFLUENCE AMÉRICAINE / SUD GLOBAL";
-                powerColor = "🟠";
-            }
+            <div class="text-right pointer-events-auto bg-black/40 p-2 border-r border-cyan-500/20">
+                <div id="clock" class="orbitron text-2xl font-bold italic">--:--:-- Z</div>
+                <div class="text-[8px] text-cyan-500/50 mt-1">Status: Liaison chiffrée AES-256</div>
+            </div>
+        </div>
 
-            // B. Analyse de la Profondeur Stratégique
-            const density = pop / area;
-            // Indice de Puissance (IPP) : Poids relatif territoire/population
-            const powerIndex = (Math.log10(pop) * 0.4 + Math.log10(area) * 0.6).toFixed(2);
-            
-            // C. Évaluation de la Menace Frontalière (Friction Systémique)
-            const frictionScore = (borders.length * 1.5).toFixed(1);
-            
-            // D. Détermination du Risque Géopolitique
-            let conflictRisk = "STABLE";
-            let strategyNote = "Maintien du statu quo.";
-            
-            if (borders.length >= 7 || (borders.length >= 4 && density > 250)) {
-                conflictRisk = "HAUTE FRAGILITÉ (ENCLAVEMENT)";
-                strategyNote = "Risque élevé de débordement transfrontalier ou d'instabilité interne.";
-            } else if (powerIndex > 7.5) {
-                conflictRisk = "PUISSANCE RÉGIONALE / HÉGÉMON";
-                strategyNote = "Capacité de projection et d'influence majeure sur les pays limitrophes.";
-            }
+        <!-- Pied de page HUD -->
+        <div class="flex justify-between items-end">
+            <div class="text-[9px] text-cyan-500/40 max-w-xs uppercase bg-black/40 p-2 terminal-border">
+                Attention: Les données affichées sont classifiées. Toute fuite est passible de sanctions militaires immédiates.
+            </div>
+            <div class="terminal-border px-4 py-2 bg-black/80 flex gap-6 pointer-events-auto">
+                <div class="flex flex-col">
+                    <span class="text-[7px]">SIGNAL</span>
+                    <span class="text-xs font-bold text-green-500">STABLE</span>
+                </div>
+                <div class="flex flex-col border-l border-cyan-500/20 pl-6">
+                    <span class="text-[7px]">NODES</span>
+                    <span class="text-xs font-bold">14.2k</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
-            // 4. RÉDACTION DU RAPPORT TECHNIQUE AVANCÉ
-            const analysis = `
-╔════════════════════════════════════════════════════════╗
-  DOSSIER DE RENSEIGNEMENT STRATÉGIQUE : UNITÉ PUPPET
-  SYSTÈME DE SURVEILLANCE MONDIAL // ACCÈS NIVEAU 4
-╚════════════════════════════════════════════════════════╝
+    <!-- Panneau de Dossier de Renseignement -->
+    <div id="info-panel" class="fixed right-0 top-0 h-full w-[500px] z-[100] p-10 flex flex-col border-l border-cyan-500/20 pointer-events-auto">
+        <div class="flex justify-between items-center mb-8">
+            <h2 id="country-title" class="orbitron text-3xl font-black italic">--</h2>
+            <button onclick="closeInfo()" class="hover:text-white transition-colors text-xl">✕</button>
+        </div>
 
-[IDENTIFICATION DE LA CIBLE]
-> NOM : ${country.toUpperCase()}
-> COORDONNÉES : ${latlng[0].toFixed(2)}N, ${latlng[1].toFixed(2)}E
-> POLARITÉ : ${powerColor} ${influenceBloc}
-> RISQUE SYSTÉMIQUE : ${conflictRisk}
+        <!-- Contenu du rapport avec scrollbar personnalisée -->
+        <div class="flex-1 overflow-y-auto custom-scroll pr-4">
+            <div id="intel-content" class="text-[11px] leading-relaxed whitespace-pre-wrap font-medium">
+                SÉLECTIONNEZ UNE CIBLE SUR LA CARTE POUR GÉNÉRER UN RAPPORT GÉOPOLITIQUE...
+            </div>
+        </div>
 
-[1. PARAMÈTRES DE PUISSANCE ÉTATIQUE]
-> Indice de Profondeur Stratégique : ${powerIndex} / 10
-> Démographie Active : ${(pop / 1000000).toFixed(2)}M d'unités
-> Contrôle Spatial : ${area.toLocaleString()} km²
-> Densité de Pression : ${density.toFixed(1)} hab/km²
+        <!-- Zone de status et chargement -->
+        <div class="mt-8 border-t border-cyan-500/10 pt-4">
+            <div id="loader-container" class="w-full h-1 bg-white/5 mb-2 hidden">
+                <div id="loader-bar" class="loader-bar"></div>
+            </div>
+            <div class="flex justify-between items-center">
+                <div id="system-status" class="text-[8px] text-cyan-500/40">IDLE_STATE</div>
+                <div class="text-[8px] text-cyan-500/40">PUPPET_MASTER_v4.2</div>
+            </div>
+        </div>
+    </div>
 
-[2. VECTEURS D'INTERACTION & FRICTION]
-> Axes de pénétration (Frontières) : ${borders.length} points de contact
-> Voisinage immédiat : ${borders.length > 0 ? borders.join(', ') : 'ISOLEMENT GÉOGRAPHIQUE'}
-> Score de Friction Systémique : ${frictionScore} / 15
-> Sphère d'influence : ${subregion.toUpperCase()}
+    <script>
+        let svg, g, projection, path;
 
-[3. ANALYSE DE LA DOCTRINE & VULNÉRABILITÉS]
-${strategyNote}
-L'analyse structurale indique que ${country} possède une ${area > 1000000 ? 'profondeur stratégique majeure permettant d\'absorber des chocs externes' : 'profondeur limitée, rendant le territoire vulnérable aux manœuvres rapides'}. 
-La position géographique ${borders.length > 5 ? 'place le pays au cœur de tensions multilatérales complexes' : 'offre une protection relative contre les pressions frontalières directes'}.
-L'influence linguistique (${languages.slice(0, 2).join(', ')}) constitue un vecteur de soft-power facilitant des ponts diplomatiques vers d'autres zones d'intérêt stratégique.
+        // Lancement du système après l'écran de démarrage
+        function bootSystem() {
+            const overlay = document.getElementById('overlay');
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 800);
+            initMap();
+            startTime();
+        }
 
-[4. ÉTAT DES FLUX]
-> Statut Infrastructure : ${pop > 50000000 ? 'RÉSEAU SATURÉ (CRITIQUE)' : 'RÉSEAU FLUIDE'}
-> Priorité d'Interception : ${powerIndex > 7 ? 'ALPHA (PRIORITAIRE)' : 'GAMMA (OBSERVATION)'}
+        // Horloge UTC
+        function startTime() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('clock').innerText = now.toLocaleTimeString('fr-FR', { timeZone: 'UTC' }) + " Z";
+            }, 1000);
+        }
 
-[STATUS] : ANALYSE VALIDÉE PAR L'ALGORITHME V4.1
-[SIGNATURE : SECTION_R_STRAT // PUPPET_MASTER]
-            `.trim();
+        // Initialisation de la carte D3.js
+        function initMap() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
 
-            return res.status(200).json({ analysis });
+            svg = d3.select("#map").append("svg")
+                .attr("width", width)
+                .attr("height", height);
 
-        } catch (error) {
-            return res.status(500).json({ 
-                error: "Défaut de liaison", 
-                analysis: `[ERREUR CRITIQUE] : Interception impossible. La cible ${country} est protégée par un brouillage ou hors réseau.` 
+            g = svg.append("g");
+
+            projection = d3.geoMercator()
+                .scale(width / 6.5)
+                .translate([width / 2.3, height / 1.55]);
+
+            path = d3.geoPath().projection(projection);
+
+            // Chargement des données géographiques (GéoJSON)
+            d3.json("https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson").then(data => {
+                g.selectAll("path")
+                    .data(data.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", path)
+                    .attr("class", "country")
+                    .on("click", function(event, d) {
+                        handleCountryClick(this, d);
+                    });
             });
-        }
-    }
 
-    return res.status(405).json({ error: "Méthode non autorisée" });
-}
+            // Ajout du zoom
+            const zoom = d3.zoom()
+                .scaleExtent([1, 15])
+                .on("zoom", (event) => g.attr("transform", event.transform));
+            
+            svg.call(zoom);
+        }
+
+        // Gestion du clic sur un pays
+        async function handleCountryClick(element, d) {
+            const countryName = d.properties.name;
+            
+            // Mise à jour visuelle du pays sélectionné
+            d3.selectAll(".country").classed("active", false);
+            d3.select(element).classed("active", true);
+
+            const panel = document.getElementById('info-panel');
+            panel.classList.add('visible');
+            
+            document.getElementById('country-title').innerText = countryName;
+            document.getElementById('intel-content').innerText = ">>> INITIATION DU PROTOCOLE D'EXTRACTION...\n>>> CONNEXION AUX SERVEURS RÉGIONAUX...\n>>> DÉCRYPTAGE DES FLUX GÉOPOLITIQUES...";
+            document.getElementById('system-status').innerText = "CONNECTING_TO_SATELLITE...";
+            
+            // Animation de la barre de chargement
+            const loader = document.getElementById('loader-container');
+            const loaderBar = document.getElementById('loader-bar');
+            loader.classList.remove('hidden');
+            loaderBar.style.width = "0%";
+            setTimeout(() => loaderBar.style.width = "100%", 10);
+
+            try {
+                // Requête POST vers l'API /api/index.js
+                const response = await fetch("/api/index", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ country: countryName })
+                });
+                
+                if (!response.ok) throw new Error("Erreur réseau");
+                
+                const result = await response.json();
+                
+                // Affichage du rapport avec effet machine à écrire
+                typeEffect(document.getElementById('intel-content'), result.analysis || result.error);
+                document.getElementById('system-status').innerText = "DATA_STREAM_VERIFIED";
+            } catch (error) {
+                document.getElementById('intel-content').innerText = "!!! ERREUR CRITIQUE !!!\nÉCHEC DE LA LIAISON SATELLITE.\nLA CIBLE EST PEUT-ÊTRE SOUS BROUILLAGE ÉLECTRONIQUE.";
+                document.getElementById('system-status').innerText = "CONNECTION_FAILED";
+            } finally {
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                    loaderBar.style.width = "0%";
+                }, 1000);
+            }
+        }
+
+        // Fonction d'effet de texte progressif
+        function typeEffect(element, text) {
+            element.innerText = "";
+            let i = 0;
+            const timer = setInterval(() => {
+                if (i < text.length) {
+                    element.append(text.charAt(i));
+                    i++;
+                } else {
+                    clearInterval(timer);
+                }
+            }, 1); // Vitesse ultra-rapide pour l'effet terminal
+        }
+
+        // Fermer le panneau latéral
+        function closeInfo() {
+            document.getElementById('info-panel').classList.remove('visible');
+            d3.selectAll(".country").classed("active", false);
+        }
+
+        // Ajuster la carte si la fenêtre change de taille
+        window.addEventListener('resize', () => {
+            location.reload();
+        });
+    </script>
+</body>
+</html>
