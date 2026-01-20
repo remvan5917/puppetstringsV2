@@ -19,8 +19,9 @@ export default async function handler(req, res) {
             const region = countryData.region;
             const subregion = countryData.subregion;
             const languages = countryData.languages ? Object.values(countryData.languages) : [];
+            const latlng = countryData.latlng || [0, 0];
             
-            // 3. ALGORITHME DE SCORING GÉOPOLITIQUE (Puppet Master v4.0 Professional)
+            // 3. ALGORITHME DE SCORING GÉOPOLITIQUE (Puppet Master v4.1 Enhanced)
             
             // A. Classification Rigoureuse des Blocs
             let influenceBloc = "AUTONOME / NON-ALIGNÉ";
@@ -45,31 +46,36 @@ export default async function handler(req, res) {
 
             // B. Analyse de la Profondeur Stratégique
             const density = pop / area;
+            // Indice de Puissance (IPP) : Poids relatif territoire/population
             const powerIndex = (Math.log10(pop) * 0.4 + Math.log10(area) * 0.6).toFixed(2);
             
             // C. Évaluation de la Menace Frontalière (Friction Systémique)
-            const borderFriction = borders.length * 2.5;
+            const frictionScore = (borders.length * 1.5).toFixed(1);
             
             // D. Détermination du Risque Géopolitique
             let conflictRisk = "STABLE";
             let strategyNote = "Maintien du statu quo.";
             
-            if (borders.length >= 7 || (borders.length >= 4 && density > 200)) {
+            if (borders.length >= 7 || (borders.length >= 4 && density > 250)) {
                 conflictRisk = "HAUTE FRAGILITÉ (ENCLAVEMENT)";
-                strategyNote = "Risque élevé de débordement transfrontalier.";
+                strategyNote = "Risque élevé de débordement transfrontalier ou d'instabilité interne.";
             } else if (powerIndex > 7.5) {
                 conflictRisk = "PUISSANCE RÉGIONALE / HÉGÉMON";
-                strategyNote = "Capacité de projection et d'influence majeure sur les voisins.";
+                strategyNote = "Capacité de projection et d'influence majeure sur les pays limitrophes.";
             }
 
-            // 4. RÉDACTION DU RAPPORT TECHNIQUE
+            // 4. RÉDACTION DU RAPPORT TECHNIQUE AVANCÉ
             const analysis = `
 ╔════════════════════════════════════════════════════════╗
   DOSSIER DE RENSEIGNEMENT STRATÉGIQUE : UNITÉ PUPPET
+  SYSTÈME DE SURVEILLANCE MONDIAL // ACCÈS NIVEAU 4
 ╚════════════════════════════════════════════════════════╝
-[CIBLE] : ${country.toUpperCase()}
-[POLARITÉ] : ${powerColor} ${influenceBloc}
-[RISQUE SYSTÉMIQUE] : ${conflictRisk}
+
+[IDENTIFICATION DE LA CIBLE]
+> NOM : ${country.toUpperCase()}
+> COORDONNÉES : ${latlng[0].toFixed(2)}N, ${latlng[1].toFixed(2)}E
+> POLARITÉ : ${powerColor} ${influenceBloc}
+> RISQUE SYSTÉMIQUE : ${conflictRisk}
 
 [1. PARAMÈTRES DE PUISSANCE ÉTATIQUE]
 > Indice de Profondeur Stratégique : ${powerIndex} / 10
@@ -77,19 +83,24 @@ export default async function handler(req, res) {
 > Contrôle Spatial : ${area.toLocaleString()} km²
 > Densité de Pression : ${density.toFixed(1)} hab/km²
 
-[2. VECTEURS D'INTERACTION]
-> Axes de friction (Frontières) : ${borders.length} points de contact
+[2. VECTEURS d'INTERACTION & FRICTION]
+> Axes de pénétration (Frontières) : ${borders.length} points de contact
 > Voisinage immédiat : ${borders.length > 0 ? borders.join(', ') : 'ISOLEMENT GÉOGRAPHIQUE'}
+> Score de Friction Systémique : ${frictionScore} / 15
 > Sphère d'influence : ${subregion.toUpperCase()}
 
-[3. ANALYSE DE LA DOCTRINE]
+[3. ANALYSE DE LA DOCTRINE & VULNÉRABILITÉS]
 ${strategyNote}
-L'analyse structurale indique que ${country} possède une ${area > 1000000 ? 'profondeur stratégique majeure' : 'profondeur limitée, vulnérable aux frappes rapides'}. 
-La position ${borders.length > 5 ? 'est au cœur de tensions multilatérales' : 'est relativement préservée des pressions directes'}.
-L'influence linguistique (${languages.slice(0, 2).join(', ')}) facilite des ponts diplomatiques vers d'autres zones d'intérêt.
+L'analyse structurale indique que ${country} possède une ${area > 1000000 ? 'profondeur stratégique majeure permettant d\'absorber des chocs externes' : 'profondeur limitée, rendant le territoire vulnérable aux manœuvres rapides'}. 
+La position géographique ${borders.length > 5 ? 'place le pays au cœur de tensions multilatérales complexes' : 'offre une protection relative contre les pressions frontalières directes'}.
+L'influence linguistique (${languages.slice(0, 2).join(', ')}) constitue un vecteur de soft-power facilitant des ponts diplomatiques vers d'autres zones d'intérêt stratégique.
 
-[STATUS] : ANALYSE VALIDÉE PAR L'ALGORITHME V4.0
-[SIGNATURE : SECTION_R_STRAT]
+[4. ÉTAT DES FLUX]
+> Statut Infrastructure : ${pop > 50000000 ? 'RÉSEAU SATURÉ (CRITIQUE)' : 'RÉSEAU FLUIDE'}
+> Priorité d'Interception : ${powerIndex > 7 ? 'ALPHA (PRIORITAIRE)' : 'GAMMA (OBSERVATION)'}
+
+[STATUS] : ANALYSE VALIDÉE PAR L'ALGORITHME V4.1
+[SIGNATURE : SECTION_R_STRAT // PUPPET_MASTER]
             `.trim();
 
             return res.status(200).json({ analysis });
@@ -97,7 +108,7 @@ L'influence linguistique (${languages.slice(0, 2).join(', ')}) facilite des pont
         } catch (error) {
             return res.status(500).json({ 
                 error: "Défaut de liaison", 
-                analysis: `[ERREUR] : Interception impossible. La cible ${country} est hors réseau.` 
+                analysis: `[ERREUR CRITIQUE] : Interception impossible. La cible ${country} est protégée par un brouillage ou hors réseau.` 
             });
         }
     }
